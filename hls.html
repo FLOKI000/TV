@@ -1,1 +1,837 @@
+<!DOCTYPE html>
+<html lang="fa" dir="rtl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>پخش‌کننده IPTV چندمنبعی</title>
+    <script src="https://cdn.jsdelivr.net/npm/hls.js@latest"></script>
+    <style>
+        /* --- استایل‌ها مثل قبل، با کمی تغییرات --- */
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+            font-family: system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
+        }
+        body {
+            background: #0f1117;
+            color: #e4e6eb;
+            display: flex;
+            justify-content: center;
+            padding: 20px;
+            min-height: 100vh;
+        }
+        .container {
+            max-width: 1000px;
+            width: 100%;
+        }
+        .header {
+            text-align: center;
+            margin-bottom: 20px;
+        }
+        .header h1 {
+            font-size: 1.8rem;
+            font-weight: 700;
+            background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+            margin-bottom: 12px;
+        }
+        .search-box {
+            display: flex;
+            gap: 10px;
+            background: #1e2128;
+            padding: 8px 16px;
+            border-radius: 50px;
+            border: 1px solid #2c303a;
+            transition: border 0.2s;
+            margin-bottom: 10px;
+        }
+        .search-box:focus-within {
+            border-color: #f5576c;
+        }
+        .search-box input {
+            flex: 1;
+            background: transparent;
+            border: none;
+            outline: none;
+            color: #e4e6eb;
+            font-size: 1rem;
+            padding: 10px 0;
+        }
+        .search-box input::placeholder {
+            color: #6b7280;
+        }
+        .search-box .icon {
+            color: #6b7280;
+            font-size: 1.2rem;
+            display: flex;
+            align-items: center;
+        }
 
+        /* بخش مدیریت منابع */
+        .source-manager {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 10px;
+            background: #1a1d24;
+            padding: 12px 16px;
+            border-radius: 16px;
+            border: 1px solid #2c303a;
+            margin-bottom: 16px;
+            align-items: center;
+        }
+        .source-manager input[type="text"] {
+            flex: 2;
+            min-width: 200px;
+            background: #0f1117;
+            border: 1px solid #2c303a;
+            border-radius: 30px;
+            padding: 8px 16px;
+            color: #e4e6eb;
+            font-size: 0.9rem;
+        }
+        .source-manager input[type="file"] {
+            display: none;
+        }
+        .source-manager .btn {
+            background: #2c303a;
+            border: none;
+            color: #e4e6eb;
+            padding: 8px 18px;
+            border-radius: 30px;
+            cursor: pointer;
+            font-size: 0.9rem;
+            transition: background 0.2s;
+            white-space: nowrap;
+        }
+        .source-manager .btn:hover {
+            background: #3b3f4a;
+        }
+        .source-manager .btn-primary {
+            background: #f5576c;
+            color: #fff;
+        }
+        .source-manager .btn-primary:hover {
+            background: #e0445a;
+        }
+        .source-manager .badge-source {
+            font-size: 0.75rem;
+            color: #9ca3af;
+            background: #0f1117;
+            padding: 4px 12px;
+            border-radius: 20px;
+            border: 1px solid #2c303a;
+        }
+
+        .stats {
+            display: flex;
+            justify-content: space-between;
+            font-size: 0.85rem;
+            color: #6b7280;
+            margin: 8px 4px;
+            flex-wrap: wrap;
+            gap: 6px;
+        }
+        .stats span {
+            background: #1e2128;
+            padding: 4px 14px;
+            border-radius: 20px;
+            border: 1px solid #2c303a;
+        }
+
+        /* لیست کانال‌ها */
+        .channel-list {
+            list-style: none;
+            margin-top: 8px;
+            display: flex;
+            flex-direction: column;
+            gap: 4px;
+            max-height: 55vh;
+            overflow-y: auto;
+            padding: 4px 2px 20px 2px;
+            direction: ltr;
+        }
+        .channel-list::-webkit-scrollbar {
+            width: 6px;
+        }
+        .channel-list::-webkit-scrollbar-track {
+            background: #1e2128;
+            border-radius: 10px;
+        }
+        .channel-list::-webkit-scrollbar-thumb {
+            background: #3b3f4a;
+            border-radius: 10px;
+        }
+        .list-section {
+            margin-bottom: 8px;
+            direction: rtl;
+        }
+        .section-title {
+            font-size: 0.9rem;
+            font-weight: 600;
+            color: #9ca3af;
+            padding: 8px 12px 4px 12px;
+            border-bottom: 1px solid #2c303a;
+            margin-bottom: 6px;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+        .section-title .badge {
+            background: #2c303a;
+            border-radius: 20px;
+            padding: 0 10px;
+            font-size: 0.75rem;
+            color: #a1a6b3;
+        }
+        .channel-item {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            padding: 10px 14px;
+            background: #1a1d24;
+            border-radius: 12px;
+            border: 1px solid transparent;
+            cursor: pointer;
+            transition: all 0.15s ease;
+            direction: rtl;
+            position: relative;
+        }
+        .channel-item:hover {
+            background: #262a33;
+            border-color: #3b3f4a;
+            transform: translateX(-4px);
+        }
+        .channel-item.active {
+            background: #2d1f2a;
+            border-color: #f5576c;
+            box-shadow: 0 0 20px rgba(245, 87, 108, 0.08);
+        }
+        .channel-logo {
+            width: 44px;
+            height: 44px;
+            border-radius: 8px;
+            background: #262a33;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 1.2rem;
+            flex-shrink: 0;
+            overflow: hidden;
+        }
+        .channel-logo img {
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+        }
+        .channel-info {
+            flex: 1;
+            min-width: 0;
+        }
+        .channel-name {
+            font-weight: 500;
+            font-size: 0.95rem;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+        .channel-group {
+            font-size: 0.75rem;
+            color: #6b7280;
+            margin-top: 2px;
+        }
+        .channel-status {
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+            background: #3b3f4a;
+            flex-shrink: 0;
+        }
+        .channel-status.online {
+            background: #22c55e;
+        }
+        .pin-btn {
+            background: transparent;
+            border: none;
+            color: #6b7280;
+            font-size: 1.2rem;
+            cursor: pointer;
+            padding: 4px 6px;
+            border-radius: 8px;
+            transition: all 0.2s;
+            flex-shrink: 0;
+            line-height: 1;
+        }
+        .pin-btn:hover {
+            background: #2c303a;
+            color: #fbbf24;
+        }
+        .pin-btn.pinned {
+            color: #fbbf24;
+        }
+        .pin-btn.pinned:hover {
+            color: #f59e0b;
+        }
+        .empty,
+        .loading,
+        .error {
+            text-align: center;
+            padding: 40px 20px;
+            color: #6b7280;
+        }
+        .error {
+            color: #f87171;
+        }
+
+        /* پلیر */
+        .player-wrapper {
+            margin-top: 20px;
+            background: #0b0d11;
+            border-radius: 16px;
+            overflow: hidden;
+            border: 1px solid #2c303a;
+        }
+        .player-wrapper video {
+            display: block;
+            width: 100%;
+            aspect-ratio: 16 / 9;
+            background: #000;
+        }
+        .player-info {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 12px 18px;
+            background: #1a1d24;
+            font-size: 0.9rem;
+            border-top: 1px solid #2c303a;
+            flex-wrap: wrap;
+            gap: 6px;
+        }
+        .player-info .now-playing {
+            color: #a1a6b3;
+        }
+        .player-info .now-playing strong {
+            color: #e4e6eb;
+            font-weight: 500;
+        }
+        .player-info .close-player {
+            background: none;
+            border: none;
+            color: #6b7280;
+            font-size: 1.2rem;
+            cursor: pointer;
+            padding: 4px 10px;
+            border-radius: 8px;
+            transition: background 0.2s;
+        }
+        .player-info .close-player:hover {
+            background: #2c303a;
+            color: #e4e6eb;
+        }
+
+        @media (max-width: 600px) {
+            .container {
+                padding: 0 4px;
+            }
+            .header h1 {
+                font-size: 1.4rem;
+            }
+            .source-manager {
+                flex-direction: column;
+                align-items: stretch;
+            }
+            .source-manager input[type="text"] {
+                min-width: unset;
+            }
+            .channel-item {
+                padding: 8px 10px;
+                gap: 8px;
+            }
+            .channel-logo {
+                width: 36px;
+                height: 36px;
+                font-size: 1rem;
+            }
+            .channel-name {
+                font-size: 0.85rem;
+            }
+            .pin-btn {
+                font-size: 1rem;
+            }
+            .player-info {
+                flex-direction: column;
+                align-items: stretch;
+                text-align: center;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>📺 پخش‌کننده IPTV</h1>
+            <div class="search-box">
+                <span class="icon">🔍</span>
+                <input type="text" id="searchInput" placeholder="جستجوی نام شبکه..." autofocus>
+            </div>
+        </div>
+
+        <!-- مدیریت منابع -->
+        <div class="source-manager">
+            <input type="text" id="newSourceInput" placeholder="لینک جدید M3U ...">
+            <button class="btn btn-primary" id="addSourceBtn">➕ افزودن</button>
+            <button class="btn" id="uploadBtn">📂 آپلود فایل</button>
+            <input type="file" id="fileInput" accept=".m3u,.m3u8">
+            <span class="badge-source" id="sourceCount">۰ منبع</span>
+        </div>
+
+        <div class="stats">
+            <span id="totalChannels">۰ شبکه</span>
+            <span id="visibleChannels">۰ نمایش داده شده</span>
+        </div>
+
+        <ul class="channel-list" id="channelList">
+            <li class="loading">⏳ در حال بارگذاری لیست شبکه‌ها...</li>
+        </ul>
+
+        <div class="player-wrapper" id="playerWrapper" style="display: none;">
+            <video id="videoPlayer" controls autoplay playsinline></video>
+            <div class="player-info">
+                <span class="now-playing">🎬 در حال پخش: <strong id="nowPlayingName">—</strong></span>
+                <button class="close-player" id="closePlayer" title="بستن پلیر">✕</button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        (function() {
+            'use strict';
+
+            // --- المنت‌ها ---
+            const channelListEl = document.getElementById('channelList');
+            const searchInput = document.getElementById('searchInput');
+            const totalChannelsEl = document.getElementById('totalChannels');
+            const visibleChannelsEl = document.getElementById('visibleChannels');
+            const playerWrapper = document.getElementById('playerWrapper');
+            const videoPlayer = document.getElementById('videoPlayer');
+            const nowPlayingName = document.getElementById('nowPlayingName');
+            const closePlayerBtn = document.getElementById('closePlayer');
+            const newSourceInput = document.getElementById('newSourceInput');
+            const addSourceBtn = document.getElementById('addSourceBtn');
+            const uploadBtn = document.getElementById('uploadBtn');
+            const fileInput = document.getElementById('fileInput');
+            const sourceCount = document.getElementById('sourceCount');
+
+            // --- وضعیت ---
+            let allChannels = [];
+            let filteredChannels = [];
+            let currentChannel = null;
+            let hls = null;
+            let pinnedUrls = new Set();
+            let sourceUrls = []; // لیست URLهایی که بارگذاری شده‌اند
+
+            const STORAGE_KEY = 'iptv_pinned';
+            const SOURCES_KEY = 'iptv_sources';
+
+            // پیش‌فرض: دو منبع معروف
+            const DEFAULT_SOURCES = [
+                'https://iptv-org.github.io/iptv/index.m3u',
+                // اینجا می‌توانید لینک فایل جدید خود را قرار دهید (بعد از آپلود در گیت‌هاب)
+                // مثال: 'https://raw.githubusercontent.com/yourusername/yourrepo/main/playlist.m3u'
+            ];
+
+            // --- توابع کمکی (پارسر و ...) ---
+            function extractChannelName(extinfLine) {
+                const lastComma = extinfLine.lastIndexOf(',');
+                if (lastComma !== -1) {
+                    let name = extinfLine.substring(lastComma + 1).trim();
+                    if (name.startsWith('"') && name.endsWith('"')) name = name.substring(1, name.length - 1);
+                    return name || 'بدون نام';
+                }
+                return 'بدون نام';
+            }
+
+            function extractLogo(extinfLine) {
+                const match = extinfLine.match(/tvg-logo="([^"]*)"/i);
+                return match ? match[1] : null;
+            }
+
+            function extractGroup(extinfLine) {
+                const match = extinfLine.match(/group-title="([^"]*)"/i);
+                return match ? match[1] : 'متفرقه';
+            }
+
+            function escapeHtml(text) {
+                if (!text) return '';
+                const div = document.createElement('div');
+                div.textContent = text;
+                return div.innerHTML;
+            }
+
+            function parseM3U(text) {
+                const lines = text.split(/\r?\n/);
+                const channels = [];
+                let currentExtinf = null;
+                for (let i = 0; i < lines.length; i++) {
+                    const line = lines[i].trim();
+                    if (line.startsWith('#EXTINF:')) {
+                        currentExtinf = line;
+                        continue;
+                    }
+                    if (!line || line.startsWith('#')) continue;
+                    if (currentExtinf && (line.startsWith('http://') || line.startsWith('https://') ||
+                            line.startsWith('rtmp://') || line.startsWith('rtsp://') || line.startsWith('mms://'))) {
+                        const name = extractChannelName(currentExtinf);
+                        const logo = extractLogo(currentExtinf);
+                        const group = extractGroup(currentExtinf);
+                        channels.push({ name, url: line, logo, group, raw: currentExtinf + '\n' + line });
+                        currentExtinf = null;
+                    } else {
+                        currentExtinf = null;
+                    }
+                }
+                return channels;
+            }
+
+            // --- مدیریت پین‌ها ---
+            function loadPinned() {
+                try {
+                    const stored = localStorage.getItem(STORAGE_KEY);
+                    pinnedUrls = stored ? new Set(JSON.parse(stored)) : new Set();
+                } catch (_) { pinnedUrls = new Set(); }
+            }
+
+            function savePinned() {
+                try {
+                    localStorage.setItem(STORAGE_KEY, JSON.stringify([...pinnedUrls]));
+                } catch (_) {}
+            }
+
+            function togglePin(url) {
+                if (pinnedUrls.has(url)) pinnedUrls.delete(url);
+                else pinnedUrls.add(url);
+                savePinned();
+                applyFilterAndRender();
+            }
+
+            // --- مدیریت منابع (ذخیره در localStorage) ---
+            function loadSources() {
+                try {
+                    const stored = localStorage.getItem(SOURCES_KEY);
+                    if (stored) {
+                        const arr = JSON.parse(stored);
+                        if (Array.isArray(arr) && arr.length > 0) {
+                            sourceUrls = arr;
+                            return;
+                        }
+                    }
+                } catch (_) {}
+                // اگر هیچ منبعی ذخیره نشده، از پیش‌فرض استفاده کن
+                sourceUrls = [...DEFAULT_SOURCES];
+                saveSources();
+            }
+
+            function saveSources() {
+                try {
+                    localStorage.setItem(SOURCES_KEY, JSON.stringify(sourceUrls));
+                } catch (_) {}
+                updateSourceBadge();
+            }
+
+            function updateSourceBadge() {
+                sourceCount.textContent = sourceUrls.length + ' منبع';
+            }
+
+            // --- افزودن منبع جدید ---
+            function addSource(url) {
+                url = url.trim();
+                if (!url) return;
+                if (!url.startsWith('http://') && !url.startsWith('https://')) {
+                    alert('لینک باید با http یا https شروع شود.');
+                    return;
+                }
+                if (sourceUrls.includes(url)) {
+                    alert('این لینک قبلاً اضافه شده است.');
+                    return;
+                }
+                sourceUrls.push(url);
+                saveSources();
+                loadAllSources();
+            }
+
+            function removeSource(index) {
+                if (sourceUrls.length <= 1) {
+                    alert('حداقل یک منبع باید باقی بماند.');
+                    return;
+                }
+                sourceUrls.splice(index, 1);
+                saveSources();
+                loadAllSources();
+            }
+
+            // --- بارگذاری همه منابع ---
+            async function loadAllSources() {
+                if (sourceUrls.length === 0) {
+                    channelListEl.innerHTML = '<li class="error">⚠️ هیچ منبعی تعریف نشده است.</li>';
+                    updateStats(0, 0);
+                    return;
+                }
+
+                channelListEl.innerHTML = '<li class="loading">⏳ در حال دریافت لیست شبکه‌ها از ' + sourceUrls.length +
+                    ' منبع...</li>';
+
+                let allNewChannels = [];
+                let errors = [];
+
+                for (let i = 0; i < sourceUrls.length; i++) {
+                    const url = sourceUrls[i];
+                    try {
+                        const resp = await fetch(url);
+                        if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
+                        const text = await resp.text();
+                        const parsed = parseM3U(text);
+                        allNewChannels = allNewChannels.concat(parsed);
+                    } catch (err) {
+                        errors.push(`${url}: ${err.message}`);
+                    }
+                }
+
+                if (allNewChannels.length === 0 && errors.length > 0) {
+                    channelListEl.innerHTML =
+                    `<li class="error">❌ تمام منابع با خطا مواجه شدند:<br>${errors.join('<br>')}</li>`;
+                    updateStats(0, 0);
+                    return;
+                }
+
+                // حذف تکراری‌ها بر اساس URL (اختیاری)
+                const unique = new Map();
+                allNewChannels.forEach(ch => {
+                    if (!unique.has(ch.url)) {
+                        unique.set(ch.url, ch);
+                    }
+                });
+                allChannels = Array.from(unique.values());
+                allChannels.sort((a, b) => a.name.localeCompare(b.name));
+
+                // اعمال پین‌های پیش‌فرض (اگر پینی وجود نداشته باشد)
+                applyDefaultPins();
+
+                applyFilterAndRender();
+                if (errors.length > 0) {
+                    console.warn('برخی منابع خطا داشتند:', errors);
+                }
+            }
+
+            // --- پین‌های پیش‌فرض (بر اساس نام‌های خاص) ---
+            function applyDefaultPins() {
+                if (pinnedUrls.size > 0) return; // اگر کاربر قبلاً پین داشته، تغییری نده
+                const keywords = ['شبکه سه', 'gem sport', 'ورزش', 'پرشینا', 'persiana', 'beIN', 'bein'];
+                allChannels.forEach(ch => {
+                    const name = ch.name.toLowerCase();
+                    if (keywords.some(k => name.includes(k))) {
+                        pinnedUrls.add(ch.url);
+                    }
+                });
+                savePinned();
+            }
+
+            // --- فیلتر و رندر ---
+            function applyFilterAndRender() {
+                const query = searchInput.value.trim().toLowerCase();
+                let filtered = allChannels.filter(ch => {
+                    if (!query) return true;
+                    return ch.name.toLowerCase().includes(query);
+                });
+
+                const pinnedFiltered = [];
+                const otherFiltered = [];
+                filtered.forEach(ch => {
+                    if (pinnedUrls.has(ch.url)) pinnedFiltered.push(ch);
+                    else otherFiltered.push(ch);
+                });
+                pinnedFiltered.sort((a, b) => a.name.localeCompare(b.name));
+                otherFiltered.sort((a, b) => a.name.localeCompare(b.name));
+
+                filteredChannels = [...pinnedFiltered, ...otherFiltered];
+                renderChannels(pinnedFiltered, otherFiltered);
+                updateStats(allChannels.length, filteredChannels.length);
+            }
+
+            function renderChannels(pinnedList, otherList) {
+                if (allChannels.length === 0) {
+                    channelListEl.innerHTML = '<li class="empty">📭 هیچ شبکه‌ای یافت نشد.</li>';
+                    return;
+                }
+
+                let html = '';
+                if (pinnedList.length > 0) {
+                    html += `<div class="list-section">
+                        <div class="section-title">⭐ پین‌شده‌ها <span class="badge">${pinnedList.length}</span></div>`;
+                    pinnedList.forEach(ch => {
+                        html += createChannelItemHtml(ch, true);
+                    });
+                    html += `</div>`;
+                }
+
+                if (otherList.length > 0 || pinnedList.length === 0) {
+                    const title = (pinnedList.length > 0) ? '📺 همه شبکه‌ها' : '📺 لیست شبکه‌ها';
+                    html += `<div class="list-section">
+                        <div class="section-title">${title} <span class="badge">${otherList.length}</span></div>`;
+                    otherList.forEach(ch => {
+                        html += createChannelItemHtml(ch, false);
+                    });
+                    html += `</div>`;
+                }
+
+                if (!html) {
+                    html = '<li class="empty">📭 هیچ شبکه‌ای با این نام یافت نشد.</li>';
+                }
+
+                channelListEl.innerHTML = html;
+
+                // رویدادها
+                document.querySelectorAll('.channel-item').forEach(item => {
+                    const url = item.dataset.url;
+                    item.addEventListener('click', function(e) {
+                        if (e.target.closest('.pin-btn')) return;
+                        const channel = allChannels.find(ch => ch.url === url);
+                        if (channel) playChannel(channel);
+                    });
+                    const pinBtn = item.querySelector('.pin-btn');
+                    if (pinBtn) {
+                        pinBtn.addEventListener('click', function(e) {
+                            e.stopPropagation();
+                            togglePin(url);
+                        });
+                    }
+                });
+            }
+
+            function createChannelItemHtml(ch, isPinned) {
+                const isActive = (currentChannel && currentChannel.url === ch.url) ? 'active' : '';
+                const logoHtml = ch.logo ?
+                    `<img src="${ch.logo}" alt="لوگو" loading="lazy" onerror="this.style.display='none'">` :
+                    '📡';
+                const pinClass = isPinned ? 'pinned' : '';
+                const pinIcon = isPinned ? '⭐' : '☆';
+                return `
+                    <li class="channel-item ${isActive}" data-url="${ch.url}">
+                        <div class="channel-logo">${logoHtml}</div>
+                        <div class="channel-info">
+                            <div class="channel-name">${escapeHtml(ch.name)}</div>
+                            <div class="channel-group">${escapeHtml(ch.group)}</div>
+                        </div>
+                        <button class="pin-btn ${pinClass}" title="پین/حذف پین">${pinIcon}</button>
+                        <div class="channel-status ${isActive ? 'online' : ''}"></div>
+                    </li>
+                `;
+            }
+
+            function updateStats(total, visible) {
+                totalChannelsEl.textContent = total.toLocaleString() + ' شبکه';
+                visibleChannelsEl.textContent = visible.toLocaleString() + ' نمایش داده شده';
+            }
+
+            // --- پخش کانال ---
+            function playChannel(channel) {
+                if (!channel || !channel.url) return;
+                if (currentChannel && currentChannel.url === channel.url) return;
+                playerWrapper.style.display = 'block';
+                nowPlayingName.textContent = channel.name;
+                currentChannel = channel;
+                if (hls) { hls.destroy();
+                    hls = null; }
+                const url = channel.url;
+                if (Hls.isSupported()) {
+                    hls = new Hls({ enableWorker: true, lowLatencyMode: true });
+                    hls.loadSource(url);
+                    hls.attachMedia(videoPlayer);
+                    hls.on(Hls.Events.MANIFEST_PARSED, () => { videoPlayer.play().catch(() => {}); });
+                    hls.on(Hls.Events.ERROR, (event, data) => {
+                        if (data.fatal) {
+                            if (data.type === Hls.ErrorTypes.NETWORK_ERROR) hls.startLoad();
+                            else if (data.type === Hls.ErrorTypes.MEDIA_ERROR) hls.recoverMediaError();
+                        }
+                    });
+                } else if (videoPlayer.canPlayType('application/vnd.apple.mpegurl')) {
+                    videoPlayer.src = url;
+                    videoPlayer.play().catch(() => {});
+                } else {
+                    alert('مرورگر شما از پخش HLS پشتیبانی نمی‌کند.');
+                    playerWrapper.style.display = 'none';
+                    currentChannel = null;
+                    return;
+                }
+                applyFilterAndRender();
+                playerWrapper.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+            }
+
+            function closePlayer() {
+                playerWrapper.style.display = 'none';
+                if (hls) { hls.destroy();
+                    hls = null; }
+                videoPlayer.pause();
+                videoPlayer.removeAttribute('src');
+                videoPlayer.load();
+                currentChannel = null;
+                applyFilterAndRender();
+            }
+
+            // --- رویدادها ---
+            searchInput.addEventListener('input', applyFilterAndRender);
+            closePlayerBtn.addEventListener('click', closePlayer);
+
+            addSourceBtn.addEventListener('click', () => {
+                const url = newSourceInput.value.trim();
+                if (url) {
+                    addSource(url);
+                    newSourceInput.value = '';
+                }
+            });
+            newSourceInput.addEventListener('keydown', (e) => {
+                if (e.key === 'Enter') {
+                    addSourceBtn.click();
+                }
+            });
+
+            uploadBtn.addEventListener('click', () => fileInput.click());
+            fileInput.addEventListener('change', function(e) {
+                const file = this.files[0];
+                if (!file) return;
+                const reader = new FileReader();
+                reader.onload = function(ev) {
+                    const text = ev.target.result;
+                    const parsed = parseM3U(text);
+                    if (parsed.length === 0) {
+                        alert('فایل معتبر نیست یا کانالی ندارد.');
+                        return;
+                    }
+                    // اضافه کردن به allChannels و رندر
+                    // برای اینکه منبع محلی باشد، یک شناسه ساختگی به URL می‌دهیم
+                    const baseName = file.name.replace(/\.[^.]+$/, '');
+                    parsed.forEach(ch => {
+                        // برای جلوگیری از تداخل، یک پسوند به URL اضافه می‌کنیم (اما اصلی را نگه می‌داریم)
+                        // بهتر است URL را همانطور نگه داریم، ولی در صورت تکراری بودن، باز هم اضافه می‌شود.
+                        allChannels.push(ch);
+                    });
+                    allChannels.sort((a, b) => a.name.localeCompare(b.name));
+                    applyDefaultPins();
+                    applyFilterAndRender();
+                    alert(`${parsed.length} کانال از فایل آپلود شده اضافه شد.`);
+                };
+                reader.readAsText(file);
+                this.value = '';
+            });
+
+            // --- شروع برنامه ---
+            loadPinned();
+            loadSources();
+            loadAllSources();
+
+        })();
+    </script>
+</body>
+</html>
